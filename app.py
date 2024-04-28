@@ -42,7 +42,7 @@ def settings_http():  # put
     username = request.args.get('username')
     password = request.args.get('password')
     device = request.args.get('device')
-    str(asyncio.run(settings_action(username, password, device)))
+    settings_action(username, password, device,  request.args)
     return 'CHANGED'
 
 
@@ -72,8 +72,8 @@ def start_action(username, password, device, args):
     asyncio.run(run('startProgram', username, password, device, args))
 
 
-def settings_action(username, password, device):
-    asyncio.run(run('settings', username, password, device))
+def settings_action(username, password, device, args):
+    asyncio.run(run('settings', username, password, device, args))
 
 
 def stop_action(username, password, device):
