@@ -6,6 +6,8 @@ ENV PORT 5000
 WORKDIR /python-docker
 
 COPY requirements.txt requirements.txt
+RUN apt-get -y update
+RUN apt-get -y install git
 RUN pip3 install -r requirements.txt
 
 
