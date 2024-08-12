@@ -1,4 +1,7 @@
-from flask import Flask
+import json
+from typing import List
+
+from flask import Flask, g
 from flask import request
 import asyncio
 from pyhon import Hon, HonAPI
@@ -7,20 +10,66 @@ from pyhon.commands import HonCommand
 
 app = Flask(__name__)
 
+async_var_initialized = False
+app.config['ASYNC_VAR'] = None
+
+
+@app.before_request
+def before_request():
+    global async_var_initialized
+    if not async_var_initialized:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        async_var = loop.run_until_complete(async_initialize())
+        app.config['ASYNC_VAR'] = async_var
+    g.hon = app.config['ASYNC_VAR']
+    # print(g.hon)
+
+    async_var_initialized = True
+
+
+async def commands(command: HonCommand):
+    await command.send()
+
+
+async def async_initialize():
+    hon = await Hon(
+        email='zawadzkipiter@gmail.com',
+        password='Klima4321',
+        mobile_id='homassistant',
+        session=None,
+        test_data_path=None,
+        refresh_token='refresh_token',
+    ).create()
+    return hon
+
 
 @app.route('/status')
 def status_http():  # put
     username = request.args.get('username')
     password = request.args.get('password')
     device = request.args.get('device')
-    return str(asyncio.run(status(username, password, device)))
+    print('status')
+    print('g.hon.api.auth.refresh_token' + g.hon.api.auth.refresh_token)
+    for device in g.hon.appliances:
+        deviceLocal: HonAppliance = device
+        extracted_values = {}
+        for key, honValue in deviceLocal.attributes['parameters'].items():
+            extracted_values[key] = str(honValue)
+        print(extracted_values)
+        return extracted_values
+    return 'error'
 
 
 @app.route('/devices')
 def devices_http():  # put
     username = request.args.get('username')
     password = request.args.get('password')
-    return str(asyncio.run(devices(username, password)))
+    acs = g.hon.appliances
+    current = list()
+    for ac in acs:
+        current.append(ac.nick_name)
+    return current
 
 
 @app.route('/ping')
@@ -28,31 +77,22 @@ def ping_http():  # put
     return 'OK2'
 
 
-@app.route('/start')
-def start_http():  # put
-    username = request.args.get('username')
-    password = request.args.get('password')
-    device = request.args.get('device')
-    start_action(username, password, device, request.args)
-    return 'STARTED'
-
-
 @app.route('/settings')
 def settings_http():  # put
     username = request.args.get('username')
     password = request.args.get('password')
     device = request.args.get('device')
-    settings_action(username, password, device,  request.args)
+    acs = g.hon.appliances
+    for ac in acs:
+        if ac.nick_name == device:
+            start_command: HonCommand = ac.commands['settings']
+            for name, setting in start_command.parameters.items():
+                # name = settings.windSpeed
+                if request.args is not None and request.args.get(name) is not None:
+                    setting.value = request.args.get(name)
+            asyncio.run(commands(start_command))
     return 'CHANGED'
 
-
-@app.route('/stop')
-def stop_http():  # put
-    username = request.args.get('username')
-    password = request.args.get('password')
-    device = request.args.get('device')
-    stop_action(username, password, device)
-    return 'STOPPED'
 
 
 @app.route('/commands')
@@ -65,58 +105,4 @@ def commands_http():  # put
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000, debug=True, threaded=True)
-
-
-def start_action(username, password, device, args):
-    asyncio.run(run('startProgram', username, password, device, args))
-
-
-def settings_action(username, password, device, args):
-    asyncio.run(run('settings', username, password, device, args))
-
-
-def stop_action(username, password, device):
-    asyncio.run(run('stopProgram', username, password, device, None))
-
-
-async def commands(username, password, device):
-    print('status')
-    async with HonAPI(username, password) as api:
-        appl = await api.load_appliances()
-        for appliance in appl:
-            if appliance['nickName'] == device:
-                att2 = await api.load_commands(HonAppliance(api, appliance))
-                return att2['settings']['setParameters']['parameters']
-
-
-async def status(username, password, device):
-    print('status')
-    async with HonAPI(username, password) as api:
-        appl = await api.load_appliances()
-        for appliance in appl:
-            if appliance['nickName'] == device:
-                att2 = await api.load_attributes(HonAppliance(api, appliance))
-                return att2['shadow']['parameters']
-
-
-async def devices(username, password):
-    async with Hon(username, password) as hon:
-        acs = hon.appliances
-        current = list()
-        for ac in acs:
-            current.append(ac.nick_name)
-        return current
-
-
-async def run(command, username, password, device, args):
-    async with Hon(username, password) as hon:
-        acs = hon.appliances
-        for ac in acs:
-            if ac.nick_name == device:
-                start_command: HonCommand = ac.commands[command]
-                for name, setting in start_command.parameters.items():
-                    # name = settings.windSpeed
-                    if args is not None and args.get(name) is not None:
-                        setting.value = args.get(name)
-                await start_command.send()
+    app.run(debug=True)
