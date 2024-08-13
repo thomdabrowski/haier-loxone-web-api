@@ -6,6 +6,21 @@
 Haier Web API - for Loxone users using [Haier's mobile app hOn](https://hon-smarthome.com/) based on [pyhOn](https://github.com/Andre0512/pyhon).
 ---
 
+# uruchomienie na rPI ( aplikacja wystawion na porcie 10000 ) 
+
+```
+docker run -d -p 10000:80 -e USERNAME="xxxxxxxx" -e PASSWORD="xxxxxx" zawadzkipiter/haier-loxone-pi:1.0.3
+```
+
+obraz zawadzkipiter/haier-loxone-pi:1.0.3 jest skompilowany na armv7
+
+jeżeli chcemy skompilować obraz na rpi 4+ w arm64 to możemy to wykonać albo budując to na raspberry pi albo na maszynie 
+lokalnej poleceniami:
+```shell
+docker buildx build --platform xxxxxx -t [repo]/[obraz] . --push
+```
+
+
 
 # Instrukcja użytkownika
 
